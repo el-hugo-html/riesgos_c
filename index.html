@@ -1,204 +1,197 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<title>WebGIS – Riesgos Cordilleranos</title>
+  <meta charset="UTF-8">
+  <title>Mapa de Eventos y Formulario</title>
 
-<!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
-<!-- Leaflet Draw -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <style>
+    #map {
+      height: 450px;
+      width: 100%;
+      margin-bottom: 20px;
+    }
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    .form-container {
+      max-width: 450px;
+      margin: auto;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      display: none;
+    }
 
-<style>
-  #map { height: 100vh; width: 100%; }
+    label {
+      font-weight: bold;
+      margin-top: 10px;
+    }
 
-  /* Modal login */
-  #auth-container {
-    position: fixed;
-    top:0; left:0;
-    width:100%; height:100%;
-    background: rgba(0,0,0,0.7);
-    display:flex; justify-content:center; align-items:center;
-    z-index: 9999;
-  }
-  #auth-box {
-    background:white; padding:20px;
-    border-radius:10px; width:300px; text-align:center;
-  }
-  input { width:100%; padding:8px; margin-bottom:10px; }
-  button { width:100%; padding:8px; margin-bottom:5px; }
-</style>
-
+    select, input, button {
+      padding: 6px;
+      width: 100%;
+      margin-top: 5px;
+    }
+  </style>
 </head>
 <body>
 
-<!-- Modal login -->
-<div id="auth-container">
-  <div id="auth-box">
-    <h3>Iniciar sesión</h3>
-    <input id="email" type="email" placeholder="Correo">
-    <input id="password" type="password" placeholder="Contraseña">
-    <button onclick="login()">Ingresar</button>
-    <button onclick="registerUser()">Crear cuenta</button>
-    <div id="auth-msg" style="color:red; margin-top:10px;"></div>
+  <h2>Reporte de Evento</h2>
+  <p>Haz clic en el mapa para agregar un punto y llenar el formulario.</p>
+
+  <div id="map"></div>
+
+  <div class="form-container" id="formBox">
+    <h3>Formulario del Evento</h3>
+
+    <form id="eventoForm">
+
+      <label>Latitud:</label>
+      <input type="text" id="lat" name="lat" readonly>
+
+      <label>Longitud:</label>
+      <input type="text" id="lng" name="lng" readonly>
+
+      <label for="evento">Tipo de evento:</label>
+      <select id="evento" name="evento" required>
+        <option value="">Seleccione…</option>
+        <option value="deslizamiento">Deslizamiento</option>
+        <option value="tormenta">Tormenta convectiva</option>
+        <option value="volcan">Actividad volcánica</option>
+        <option value="alud">Alud</option>
+      </select>
+
+      <!-- Contenedor dinámico -->
+      <div id="extraFields"></div>
+
+      <label>Imagen del suceso:</label>
+      <input type="file" id="foto" name="foto" accept="image/png,image/jpeg" required>
+
+      <button type="submit">Enviar</button>
+    </form>
   </div>
-</div>
 
-<div id="map"></div>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<script>
-// ---------------------------------------------------------------
-// 1. CONFIGURACIÓN FIREBASE 
-// ---------------------------------------------------------------
-const firebaseConfig = {
-  apiKey: "AIzaSyDLof94-6ZgKmv4eJJsdZmR1byH_n-GkMI",
-  authDomain: "webgis-3d0ee.firebaseapp.com",
-  projectId: "webgis-3d0ee",
-  storageBucket: "webgis-3d0ee.firebasestorage.app",
-  messagingSenderId: "146120310668",
-  appId: "1:146120310668:web:9e5e36229b70e347c8a0a9"
-};
+  <script>
+    // Inicializar mapa
+    var map = L.map('map').setView([ -33.45, -70.66 ], 6); // Chile como vista inicial
+    var marker = null;
 
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+    // Cargar tiles OSM
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
-// Variables globales
-let currentUser = null;
+    // Manejo clic en mapa
+    map.on('click', function (e) {
+      var lat = e.latlng.lat;
+      var lng = e.latlng.lng;
 
-// ---------------------------------------------------------------
-// 2. AUTENTICACIÓN
-// ---------------------------------------------------------------
-function registerUser() {
-    const email = document.getElementById("email").value;
-    const pass  = document.getElementById("password").value;
+      // Si existe un marcador anterior, eliminarlo
+      if (marker) map.removeLayer(marker);
 
-    auth.createUserWithEmailAndPassword(email, pass)
-        .then(() => {
-            document.getElementById("auth-msg").innerText = "Cuenta creada. Ahora puedes iniciar sesión.";
-        })
-        .catch(err => {
-            document.getElementById("auth-msg").innerText = err.message;
-        });
-}
+      // Crear marcador nuevo
+      marker = L.marker([lat, lng]).addTo(map);
 
-function login() {
-    const email = document.getElementById("email").value;
-    const pass  = document.getElementById("password").value;
-
-    auth.signInWithEmailAndPassword(email, pass)
-        .then(() => {
-            document.getElementById("auth-container").style.display = "none";
-        })
-        .catch(err => {
-            document.getElementById("auth-msg").innerText = err.message;
-        });
-}
-
-auth.onAuthStateChanged(user => {
-    if (user) {
-        currentUser = user.email;
-        console.log("Sesión iniciada:", currentUser);
-    } else {
-        document.getElementById("auth-container").style.display = "flex";
-    }
-});
-
-// ---------------------------------------------------------------
-// 3. MAPA LEAFLET
-// ---------------------------------------------------------------
-let map = L.map('map').setView([-35.4, -71.3], 7);
-
-// Base maps
-let osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19
-}).addTo(map);
-
-let satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
-
-// Capa para eventos guardados
-let eventosLayer = L.layerGroup().addTo(map);
-
-// Controles
-L.control.layers(
-  { "OSM": osm, "Satélite": satelite },
-  { "Eventos guardados": eventosLayer }
-).addTo(map);
-
-// ---------------------------------------------------------------
-// 4. LEAFLET DRAW
-// ---------------------------------------------------------------
-let drawnItems = new L.FeatureGroup();
-map.addLayer(drawnItems);
-
-let drawControl = new L.Control.Draw({
-  draw: { marker: true, polyline: false, polygon: false, rectangle: false, circle: false },
-  edit: { featureGroup: drawnItems }
-});
-
-map.addControl(drawControl);
-
-// Cuando el usuario crea un punto
-map.on(L.Draw.Event.CREATED, function (e) {
-  let layer = e.layer;
-  let latlng = layer.getLatLng();
-
-  if (!currentUser) {
-      alert("Debes iniciar sesión para registrar eventos.");
-      return;
-  }
-
-  // POPUP
-  layer.bindPopup(
-      "<b>Registrado por:</b> " + currentUser +
-      "<br><b>Lat:</b> " + latlng.lat.toFixed(5) +
-      "<br><b>Lon:</b> " + latlng.lng.toFixed(5)
-  );
-
-  drawnItems.addLayer(layer);
-
-  // ----------------------------
-  // GUARDAR EN FIRESTORE
-  // ----------------------------
-  db.collection("eventos").add({
-      usuario: currentUser,
-      lat: latlng.lat,
-      lon: latlng.lng,
-      timestamp: new Date()
-  })
-  .then(() => {
-      console.log("Evento guardado");
-      alert("Evento registrado correctamente.");
-  })
-  .catch(err => console.error("Error al guardar:", err));
-});
-
-// ---------------------------------------------------------------
-// 5. CARGAR EVENTOS DESDE FIRESTORE
-// ---------------------------------------------------------------
-db.collection("eventos").onSnapshot(snapshot => {
-    eventosLayer.clearLayers();
-
-    snapshot.forEach(doc => {
-        let data = doc.data();
-
-        let marker = L.marker([data.lat, data.lon]).bindPopup(
-            "<b>Registrado por:</b> " + data.usuario +
-            "<br><b>Fecha:</b> " + new Date(data.timestamp.seconds * 1000).toLocaleString()
-        );
-
-        eventosLayer.addLayer(marker);
+      // Mostrar formulario
+      document.getElementById('formBox').style.display = "block";
+      document.getElementById('lat').value = lat.toFixed(6);
+      document.getElementById('lng').value = lng.toFixed(6);
     });
-});
-</script>
+
+    // Manejo de cambio de tipo de evento
+    document.getElementById('evento').addEventListener('change', function () {
+      var tipo = this.value;
+      var extra = document.getElementById('extraFields');
+
+      extra.innerHTML = ""; // limpiar
+
+      if (tipo === "deslizamiento") {
+        extra.innerHTML = `
+          <label>Tipo de material desplegado:</label>
+          <input type="text" name="material">
+
+          <label>Velocidad aparente de remoción:</label>
+          <input type="text" name="velocidad">
+
+          <label>Mecanismo de activación:</label>
+          <input type="text" name="mecanismo">
+
+          <label>Daños observados:</label>
+          <input type="text" name="danios">
+        `;
+      }
+
+      else if (tipo === "tormenta") {
+        extra.innerHTML = `
+          <label>Duración del evento:</label>
+          <input type="text" name="duracion">
+
+          <label>Longitud de viaje del evento:</label>
+          <input type="text" name="longitudViaje">
+
+          <label>Dirección de viaje del evento:</label>
+          <input type="text" name="direccionViaje">
+        `;
+      }
+
+      else if (tipo === "volcan") {
+        extra.innerHTML = `
+          <label>Caída de ceniza:</label>
+          <select name="ceniza">
+            <option value="">Seleccione…</option>
+            <option value="si">Sí</option>
+            <option value="no">No</option>
+          </select>
+
+          <label>Flujos de lava:</label>
+          <select name="lava">
+            <option value="">Seleccione…</option>
+            <option value="si">Sí</option>
+            <option value="no">No</option>
+          </select>
+
+          <label>Lahares:</label>
+          <select name="lahares">
+            <option value="">Seleccione…</option>
+            <option value="si">Sí</option>
+            <option value="no">No</option>
+          </select>
+
+          <label>Sismicidad:</label>
+          <select name="sismicidad">
+            <option value="">Seleccione…</option>
+            <option value="si">Sí</option>
+            <option value="no">No</option>
+          </select>
+        `;
+      }
+
+      else if (tipo === "alud") {
+        extra.innerHTML = `
+          <label>Tipo de desprendimiento:</label>
+          <input type="text" name="desprendimiento">
+
+          <label>Orientación de la pendiente:</label>
+          <input type="text" name="orientacion">
+
+          <label>Contribuyentes de activación (viento, temperatura, etc.):</label>
+          <input type="text" name="contribuyentes">
+        `;
+      }
+
+    });
+
+    // Envío del formulario
+    document.getElementById('eventoForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      alert("Formulario enviado (aquí puedes programar el guardado).");
+    });
+  </script>
 
 </body>
 </html>
