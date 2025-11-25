@@ -1,89 +1,204 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Mapa con Formulario</title>
-  <!-- Estilos de Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <style>
-    #map {
-      height: 400px;
-      width: 100%;
-      margin-bottom: 20px;
-    }
-    form {
-      max-width: 400px;
-      margin: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    label {
-      font-weight: bold;
-    }
-  </style>
+<meta charset="utf-8" />
+<title>WebGIS – Riesgos Cordilleranos</title>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- Leaflet Draw -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<style>
+  #map { height: 100vh; width: 100%; }
+
+  /* Modal login */
+  #auth-container {
+    position: fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background: rgba(0,0,0,0.7);
+    display:flex; justify-content:center; align-items:center;
+    z-index: 9999;
+  }
+  #auth-box {
+    background:white; padding:20px;
+    border-radius:10px; width:300px; text-align:center;
+  }
+  input { width:100%; padding:8px; margin-bottom:10px; }
+  button { width:100%; padding:8px; margin-bottom:5px; }
+</style>
+
 </head>
 <body>
-  <h2>Mapa y Formulario</h2>
-  <div id="map"></div>
 
-  <form id="eventoForm">
-    <label for="lat">Latitud:</label>
-    <input type="text" id="lat" name="lat" readonly>
+<!-- Modal login -->
+<div id="auth-container">
+  <div id="auth-box">
+    <h3>Iniciar sesión</h3>
+    <input id="email" type="email" placeholder="Correo">
+    <input id="password" type="password" placeholder="Contraseña">
+    <button onclick="login()">Ingresar</button>
+    <button onclick="registerUser()">Crear cuenta</button>
+    <div id="auth-msg" style="color:red; margin-top:10px;"></div>
+  </div>
+</div>
 
-    <label for="lng">Longitud:</label>
-    <input type="text" id="lng" name="lng" readonly>
+<div id="map"></div>
 
-    <label for="evento">Evento:</label>
-    <input type="text" id="evento" name="evento" required>
+<script>
+// ---------------------------------------------------------------
+// 1. CONFIGURACIÓN FIREBASE 
+// ---------------------------------------------------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyDLof94-6ZgKmv4eJJsdZmR1byH_n-GkMI",
+  authDomain: "webgis-3d0ee.firebaseapp.com",
+  projectId: "webgis-3d0ee",
+  storageBucket: "webgis-3d0ee.firebasestorage.app",
+  messagingSenderId: "146120310668",
+  appId: "1:146120310668:web:9e5e36229b70e347c8a0a9"
+};
 
-    <label for="magnitud">Magnitud:</label>
-    <input type="text" id="magnitud" name="magnitud" required>
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-    <label for="foto">Foto (PNG):</label>
-    <input type="file" id="foto" name="foto" accept="image/png" required>
+// Variables globales
+let currentUser = null;
 
-    <button type="submit">Enviar</button>
-  </form>
+// ---------------------------------------------------------------
+// 2. AUTENTICACIÓN
+// ---------------------------------------------------------------
+function registerUser() {
+    const email = document.getElementById("email").value;
+    const pass  = document.getElementById("password").value;
 
-  <!-- Scripts de Leaflet -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script>
-    // Inicializar mapa
-    var map = L.map('map').setView([0, 0], 2);
+    auth.createUserWithEmailAndPassword(email, pass)
+        .then(() => {
+            document.getElementById("auth-msg").innerText = "Cuenta creada. Ahora puedes iniciar sesión.";
+        })
+        .catch(err => {
+            document.getElementById("auth-msg").innerText = err.message;
+        });
+}
 
-    // Cargar tiles de OpenStreetMap
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+function login() {
+    const email = document.getElementById("email").value;
+    const pass  = document.getElementById("password").value;
 
-    // Obtener ubicación del usuario
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(function(position) {
-        var lat = position.coords.latitude;
-        var lng = position.coords.longitude;
+    auth.signInWithEmailAndPassword(email, pass)
+        .then(() => {
+            document.getElementById("auth-container").style.display = "none";
+        })
+        .catch(err => {
+            document.getElementById("auth-msg").innerText = err.message;
+        });
+}
 
-        // Centrar mapa y añadir marcador
-        map.setView([lat, lng], 13);
-        L.marker([lat, lng]).addTo(map)
-          .bindPopup("Tu ubicación")
-          .openPopup();
-
-        // Rellenar campos del formulario
-        document.getElementById('lat').value = lat;
-        document.getElementById('lng').value = lng;
-      }, function(error) {
-        alert("No se pudo obtener tu ubicación: " + error.message);
-      });
+auth.onAuthStateChanged(user => {
+    if (user) {
+        currentUser = user.email;
+        console.log("Sesión iniciada:", currentUser);
     } else {
-      alert("La geolocalización no está soportada en este navegador.");
+        document.getElementById("auth-container").style.display = "flex";
     }
+});
 
-    // Manejo del formulario (ejemplo simple)
-    document.getElementById('eventoForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      alert("Formulario enviado. Aquí podrías procesar los datos.");
+// ---------------------------------------------------------------
+// 3. MAPA LEAFLET
+// ---------------------------------------------------------------
+let map = L.map('map').setView([-35.4, -71.3], 7);
+
+// Base maps
+let osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
+}).addTo(map);
+
+let satelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+
+// Capa para eventos guardados
+let eventosLayer = L.layerGroup().addTo(map);
+
+// Controles
+L.control.layers(
+  { "OSM": osm, "Satélite": satelite },
+  { "Eventos guardados": eventosLayer }
+).addTo(map);
+
+// ---------------------------------------------------------------
+// 4. LEAFLET DRAW
+// ---------------------------------------------------------------
+let drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+let drawControl = new L.Control.Draw({
+  draw: { marker: true, polyline: false, polygon: false, rectangle: false, circle: false },
+  edit: { featureGroup: drawnItems }
+});
+
+map.addControl(drawControl);
+
+// Cuando el usuario crea un punto
+map.on(L.Draw.Event.CREATED, function (e) {
+  let layer = e.layer;
+  let latlng = layer.getLatLng();
+
+  if (!currentUser) {
+      alert("Debes iniciar sesión para registrar eventos.");
+      return;
+  }
+
+  // POPUP
+  layer.bindPopup(
+      "<b>Registrado por:</b> " + currentUser +
+      "<br><b>Lat:</b> " + latlng.lat.toFixed(5) +
+      "<br><b>Lon:</b> " + latlng.lng.toFixed(5)
+  );
+
+  drawnItems.addLayer(layer);
+
+  // ----------------------------
+  // GUARDAR EN FIRESTORE
+  // ----------------------------
+  db.collection("eventos").add({
+      usuario: currentUser,
+      lat: latlng.lat,
+      lon: latlng.lng,
+      timestamp: new Date()
+  })
+  .then(() => {
+      console.log("Evento guardado");
+      alert("Evento registrado correctamente.");
+  })
+  .catch(err => console.error("Error al guardar:", err));
+});
+
+// ---------------------------------------------------------------
+// 5. CARGAR EVENTOS DESDE FIRESTORE
+// ---------------------------------------------------------------
+db.collection("eventos").onSnapshot(snapshot => {
+    eventosLayer.clearLayers();
+
+    snapshot.forEach(doc => {
+        let data = doc.data();
+
+        let marker = L.marker([data.lat, data.lon]).bindPopup(
+            "<b>Registrado por:</b> " + data.usuario +
+            "<br><b>Fecha:</b> " + new Date(data.timestamp.seconds * 1000).toLocaleString()
+        );
+
+        eventosLayer.addLayer(marker);
     });
-  </script>
+});
+</script>
+
 </body>
 </html>
