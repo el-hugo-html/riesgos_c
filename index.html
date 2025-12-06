@@ -62,7 +62,6 @@
         <option value="alud">Alud</option>
       </select>
 
-      <!-- Contenedor dinámico -->
       <div id="extraFields"></div>
 
       <label>Imagen del suceso:</label>
@@ -74,123 +73,154 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
+    // Supabase config - debes reemplazar estos valores
+    const SUPABASE_URL = "https://iktdhszjkirxxtufyivl.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrdGRoc3pqa2lyeHh0dWZ5aXZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNDU2NjQsImV4cCI6MjA4MDYyMTY2NH0.HNdPh-wmFXJvRn5vF2IR0r23CEu-ik-eiiKkXNnQHlU";
+
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     // Inicializar mapa
-    var map = L.map('map').setView([ -33.45, -70.66 ], 6); // Chile como vista inicial
+    var map = L.map('map').setView([ -33.45, -70.66 ], 6);
     var marker = null;
 
-    // Cargar tiles OSM
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Manejo clic en mapa
     map.on('click', function (e) {
       var lat = e.latlng.lat;
       var lng = e.latlng.lng;
 
-      // Si existe un marcador anterior, eliminarlo
       if (marker) map.removeLayer(marker);
 
-      // Crear marcador nuevo
       marker = L.marker([lat, lng]).addTo(map);
 
-      // Mostrar formulario
       document.getElementById('formBox').style.display = "block";
       document.getElementById('lat').value = lat.toFixed(6);
       document.getElementById('lng').value = lng.toFixed(6);
     });
 
-    // Manejo de cambio de tipo de evento
     document.getElementById('evento').addEventListener('change', function () {
       var tipo = this.value;
       var extra = document.getElementById('extraFields');
-
-      extra.innerHTML = ""; // limpiar
+      extra.innerHTML = "";
 
       if (tipo === "deslizamiento") {
         extra.innerHTML = `
           <label>Tipo de material desplegado:</label>
           <input type="text" name="material">
-
           <label>Velocidad aparente de remoción:</label>
           <input type="text" name="velocidad">
-
           <label>Mecanismo de activación:</label>
           <input type="text" name="mecanismo">
-
           <label>Daños observados:</label>
-          <input type="text" name="danios">
-        `;
+          <input type="text" name="danios">`;
       }
-
       else if (tipo === "tormenta") {
         extra.innerHTML = `
           <label>Duración del evento:</label>
           <input type="text" name="duracion">
-
           <label>Longitud de viaje del evento:</label>
           <input type="text" name="longitudViaje">
-
           <label>Dirección de viaje del evento:</label>
-          <input type="text" name="direccionViaje">
-        `;
+          <input type="text" name="direccionViaje">`;
       }
-
       else if (tipo === "volcan") {
         extra.innerHTML = `
           <label>Caída de ceniza:</label>
-          <select name="ceniza">
-            <option value="">Seleccione…</option>
-            <option value="si">Sí</option>
-            <option value="no">No</option>
-          </select>
-
+          <select name="ceniza"><option value="">Seleccione…</option><option value="si">Sí</option><option value="no">No</option></select>
           <label>Flujos de lava:</label>
-          <select name="lava">
-            <option value="">Seleccione…</option>
-            <option value="si">Sí</option>
-            <option value="no">No</option>
-          </select>
-
+          <select name="lava"><option value="">Seleccione…</option><option value="si">Sí</option><option value="no">No</option></select>
           <label>Lahares:</label>
-          <select name="lahares">
-            <option value="">Seleccione…</option>
-            <option value="si">Sí</option>
-            <option value="no">No</option>
-          </select>
-
+          <select name="lahares"><option value="">Seleccione…</option><option value="si">Sí</option><option value="no">No</option></select>
           <label>Sismicidad:</label>
-          <select name="sismicidad">
-            <option value="">Seleccione…</option>
-            <option value="si">Sí</option>
-            <option value="no">No</option>
-          </select>
-        `;
+          <select name="sismicidad"><option value="">Seleccione…</option><option value="si">Sí</option><option value="no">No</option></select>`;
       }
-
       else if (tipo === "alud") {
         extra.innerHTML = `
           <label>Tipo de desprendimiento:</label>
           <input type="text" name="desprendimiento">
-
           <label>Orientación de la pendiente:</label>
           <input type="text" name="orientacion">
-
-          <label>Contribuyentes de activación (viento, temperatura, etc.):</label>
-          <input type="text" name="contribuyentes">
-        `;
+          <label>Contribuyentes de activación:</label>
+          <input type="text" name="contribuyentes">`;
       }
-
     });
 
-    // Envío del formulario
-    document.getElementById('eventoForm').addEventListener('submit', function (e) {
+    document.getElementById('eventoForm').addEventListener('submit', async function (e) {
       e.preventDefault();
 
-      alert("Formulario enviado (aquí puedes programar el guardado).");
+      const lat = document.getElementById('lat').value;
+      const lng = document.getElementById('lng').value;
+      const tipo = document.getElementById('evento').value;
+
+      const extraFields = {};
+      document.querySelectorAll('#extraFields [name]').forEach(inp => {
+        extraFields[inp.name] = inp.value;
+      });
+
+      const fotoFile = document.getElementById('foto').files[0];
+      const fileName = `${crypto.randomUUID()}-${fotoFile.name}`;
+
+      const { data: uploadData, error: uploadError } = await supabaseClient
+        .storage
+        .from("eventos-fotos")
+        .upload(fileName, fotoFile);
+
+      if (uploadError) {
+        alert("Error al subir la imagen");
+        console.error(uploadError);
+        return;
+      }
+
+      const { error } = await supabaseClient
+        .from("eventos")
+        .insert([{
+          lat: lat,
+          lng: lng,
+          evento: tipo,
+          datos: extraFields,
+          estado: "pendiente",
+          foto_path: uploadData.path
+        }]);
+
+      if (error) {
+        alert("Error al guardar el evento");
+        console.error(error);
+        return;
+      }
+
+      alert("¡Evento enviado para revisión!");
+      document.getElementById('formBox').style.display = "none";
     });
+
+    async function cargarEventosAprobados() {
+      const { data, error } = await supabaseClient
+        .from("eventos")
+        .select("*")
+        .eq("estado", "aprobado");
+
+      if (error) {
+        console.error("Error cargando eventos:", error);
+        return;
+      }
+
+      data.forEach(ev => {
+        const fotoURL = `${SUPABASE_URL}/storage/v1/object/public/eventos-fotos/${ev.foto_path}`;
+
+        L.marker([ev.lat, ev.lng])
+          .addTo(map)
+          .bindPopup(`
+            <b>${ev.evento}</b><br>
+            <img src="${fotoURL}" width="150"><br>
+            <pre>${JSON.stringify(ev.datos, null, 2)}</pre>`);
+      });
+    }
+
+    cargarEventosAprobados();
   </script>
 
 </body>
