@@ -2,73 +2,96 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mapa de Eventos y Formulario</title>
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
-  <style>
-    #map {
-      height: 450px;
-      width: 100%;
-      margin-bottom: 20px;
-    }
-
-    .form-container {
-      max-width: 450px;
-      margin: auto;
-      padding: 15px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      display: none;
-    }
-
-    label {
-      font-weight: bold;
-      margin-top: 10px;
-    }
-
-    select, input, button {
-      padding: 6px;
-      width: 100%;
-      margin-top: 5px;
-    }
-  </style>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gray-100 text-gray-800 font-sans">
 
-  <h2>Reporte de Evento</h2>
-  <p>Haz clic en el mapa para agregar un punto y llenar el formulario.</p>
+  <div class="container mx-auto p-4 relative">
+    <h2 class="text-3xl font-bold text-center mb-2 text-blue-700">Reporte de Evento</h2>
+    <p class="text-center mb-6 text-gray-600">Haz clic en el mapa para agregar un punto y llenar el formulario.</p>
 
-  <div id="map"></div>
+    <div class="relative h-[75vh] w-full mb-8 rounded-xl shadow-lg border-2 border-white overflow-hidden">
+      <div id="map" class="h-full w-full z-0"></div>
 
-  <div class="form-container" id="formBox">
-    <h3>Formulario del Evento</h3>
+      <!-- Panel de Filtros -->
+      <div class="absolute bottom-4 left-4 z-[1000] bg-white p-4 rounded-xl shadow-2xl max-w-xs">
+        <h3 class="text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Filtrar Eventos</h3>
+        <div class="space-y-2">
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" value="deslizamiento" class="filter-checkbox form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500" checked>
+            <span class="text-sm text-gray-700">Deslizamiento</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" value="tormenta" class="filter-checkbox form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500" checked>
+            <span class="text-sm text-gray-700">Tormenta convectiva</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" value="volcan" class="filter-checkbox form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500" checked>
+            <span class="text-sm text-gray-700">Actividad volcánica</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" value="alud" class="filter-checkbox form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500" checked>
+            <span class="text-sm text-gray-700">Alud</span>
+          </label>
+        </div>
+        
+        <div class="mt-4 pt-4 border-t border-gray-200">
+          <button id="btnMedir" class="w-full flex items-center justify-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-3 rounded transition text-sm border border-gray-300">
+            <span>Medir Distancia</span>
+          </button>
+          <p id="medidaResultado" class="text-center text-xs text-gray-500 mt-2 hidden">Arrastra para medir</p>
+        </div>
+      </div>
 
-    <form id="eventoForm">
+      <div class="absolute top-4 right-4 z-[1000] max-w-sm w-full bg-white p-4 rounded-xl shadow-2xl hidden max-h-[calc(100%-2rem)] overflow-y-auto" id="formBox">
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+          <h3 class="text-lg font-semibold text-gray-800">Formulario del Evento</h3>
+          <button type="button" onclick="document.getElementById('formBox').classList.add('hidden')" class="text-gray-500 hover:text-red-500 font-bold text-xl">&times;</button>
+        </div>
 
-      <label>Latitud:</label>
-      <input type="text" id="lat" name="lat" readonly>
+        <form id="eventoForm" class="space-y-3">
 
-      <label>Longitud:</label>
-      <input type="text" id="lng" name="lng" readonly>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Latitud</label>
+              <input type="text" id="lat" name="lat" readonly class="w-full p-2 bg-gray-100 border border-gray-300 rounded text-xs text-gray-600 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Longitud</label>
+              <input type="text" id="lng" name="lng" readonly class="w-full p-2 bg-gray-100 border border-gray-300 rounded text-xs text-gray-600 focus:outline-none">
+            </div>
+          </div>
 
-      <label for="evento">Tipo de evento:</label>
-      <select id="evento" name="evento" required>
-        <option value="">Seleccione…</option>
-        <option value="deslizamiento">Deslizamiento</option>
-        <option value="tormenta">Tormenta convectiva</option>
-        <option value="volcan">Actividad volcánica</option>
-        <option value="alud">Alud</option>
-      </select>
+          <div>
+            <label for="evento" class="block text-sm font-medium text-gray-700 mb-1">Tipo de evento</label>
+            <select id="evento" name="evento" required class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none">
+              <option value="">Seleccione…</option>
+              <option value="deslizamiento">Deslizamiento</option>
+              <option value="tormenta">Tormenta convectiva</option>
+              <option value="volcan">Actividad volcánica</option>
+              <option value="alud">Alud</option>
+            </select>
+          </div>
 
-      <div id="extraFields"></div>
+          <div id="extraFields" class="space-y-2 p-2 bg-gray-50 rounded border border-gray-200 empty:hidden"></div>
 
-      <label>Imagen del suceso:</label>
-      <input type="file" id="foto" name="foto" accept="image/png,image/jpeg" required>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Imagen del suceso</label>
+            <input type="file" id="foto" name="foto" accept="image/png,image/jpeg" required class="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition">
+          </div>
 
-      <button type="submit">Enviar</button>
-    </form>
+          <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 text-sm">
+            Enviar Reporte
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 
   <!-- Leaflet JS -->
@@ -76,21 +99,23 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
-    // Supabase config - debes reemplazar estos valores
     const SUPABASE_URL = "https://iktdhszjkirxxtufyivl.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrdGRoc3pqa2lyeHh0dWZ5aXZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNDU2NjQsImV4cCI6MjA4MDYyMTY2NH0.HNdPh-wmFXJvRn5vF2IR0r23CEu-ik-eiiKkXNnQHlU";
 
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Inicializar mapa
     var map = L.map('map').setView([ -33.45, -70.66 ], 6);
     var marker = null;
+    var markersLayer = L.layerGroup().addTo(map); 
+    var todosLosEventos = []; 
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
     map.on('click', function (e) {
+      if (isMeasuring) return; 
+
       var lat = e.latlng.lat;
       var lng = e.latlng.lng;
 
@@ -98,7 +123,10 @@
 
       marker = L.marker([lat, lng]).addTo(map);
 
-      document.getElementById('formBox').style.display = "block";
+      const formBox = document.getElementById('formBox');
+      formBox.classList.remove('hidden');
+
+      
       document.getElementById('lat').value = lat.toFixed(6);
       document.getElementById('lng').value = lng.toFixed(6);
     });
@@ -108,93 +136,107 @@
       var extra = document.getElementById('extraFields');
       extra.innerHTML = "";
 
+      const createInput = (label, name) => `
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">${label}</label>
+          <input type="text" name="${name}" class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none">
+        </div>`;
+      
+      const createSelect = (label, name) => `
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">${label}</label>
+          <select name="${name}" class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none">
+            <option value="">Seleccione…</option>
+            <option value="si">Sí</option>
+            <option value="no">No</option>
+          </select>
+        </div>`;
+
       if (tipo === "deslizamiento") {
-        extra.innerHTML = `
-          <label>Tipo de material desplegado:</label>
-          <input type="text" name="material">
-          <label>Velocidad aparente de remoción:</label>
-          <input type="text" name="velocidad">
-          <label>Mecanismo de activación:</label>
-          <input type="text" name="mecanismo">
-          <label>Daños observados:</label>
-          <input type="text" name="danios">`;
+        extra.innerHTML = 
+          createInput("Tipo de material desplegado", "material") +
+          createInput("Velocidad aparente de remoción", "velocidad") +
+          createInput("Mecanismo de activación", "mecanismo") +
+          createInput("Daños observados", "danios");
       }
       else if (tipo === "tormenta") {
-        extra.innerHTML = `
-          <label>Duración del evento:</label>
-          <input type="text" name="duracion">
-          <label>Longitud de viaje del evento:</label>
-          <input type="text" name="longitudViaje">
-          <label>Dirección de viaje del evento:</label>
-          <input type="text" name="direccionViaje">`;
+        extra.innerHTML = 
+          createInput("Duración del evento", "duracion") +
+          createInput("Longitud de viaje del evento", "longitudViaje") +
+          createInput("Dirección de viaje del evento", "direccionViaje");
       }
       else if (tipo === "volcan") {
-        extra.innerHTML = `
-          <label>Caída de ceniza:</label>
-          <select name="ceniza"><option value="">Seleccione…</option><option value="si">Sí</option><option value="no">No</option></select>
-          <label>Flujos de lava:</label>
-          <select name="lava"><option value="">Seleccione…</option><option value="si">Sí</option><option value="no">No</option></select>
-          <label>Lahares:</label>
-          <select name="lahares"><option value="">Seleccione…</option><option value="si">Sí</option><option value="no">No</option></select>
-          <label>Sismicidad:</label>
-          <select name="sismicidad"><option value="">Seleccione…</option><option value="si">Sí</option><option value="no">No</option></select>`;
+        extra.innerHTML = 
+          createSelect("Caída de ceniza", "ceniza") +
+          createSelect("Flujos de lava", "lava") +
+          createSelect("Lahares", "lahares") +
+          createSelect("Sismicidad", "sismicidad");
       }
       else if (tipo === "alud") {
-        extra.innerHTML = `
-          <label>Tipo de desprendimiento:</label>
-          <input type="text" name="desprendimiento">
-          <label>Orientación de la pendiente:</label>
-          <input type="text" name="orientacion">
-          <label>Contribuyentes de activación:</label>
-          <input type="text" name="contribuyentes">`;
+        extra.innerHTML = 
+          createInput("Tipo de desprendimiento", "desprendimiento") +
+          createInput("Orientación de la pendiente", "orientacion") +
+          createInput("Contribuyentes de activación", "contribuyentes");
       }
     });
 
     document.getElementById('eventoForm').addEventListener('submit', async function (e) {
       e.preventDefault();
 
-      const lat = document.getElementById('lat').value;
-      const lng = document.getElementById('lng').value;
-      const tipo = document.getElementById('evento').value;
+      const submitBtn = this.querySelector('button[type="submit"]');
+      const originalBtnText = submitBtn.innerText;
+      submitBtn.disabled = true;
+      submitBtn.innerText = "Enviando...";
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
-      const extraFields = {};
-      document.querySelectorAll('#extraFields [name]').forEach(inp => {
-        extraFields[inp.name] = inp.value;
-      });
+      try {
+        const lat = document.getElementById('lat').value;
+        const lng = document.getElementById('lng').value;
+        const tipo = document.getElementById('evento').value;
 
-      const fotoFile = document.getElementById('foto').files[0];
-      const fileName = `${crypto.randomUUID()}-${fotoFile.name}`;
+        const extraFields = {};
+        document.querySelectorAll('#extraFields [name]').forEach(inp => {
+          extraFields[inp.name] = inp.value;
+        });
 
-      const { data: uploadData, error: uploadError } = await supabaseClient
-        .storage
-        .from("eventos-fotos")
-        .upload(fileName, fotoFile);
+        const fotoFile = document.getElementById('foto').files[0];
+        const fileName = `${crypto.randomUUID()}-${fotoFile.name}`;
 
-      if (uploadError) {
-        alert("Error al subir la imagen");
-        console.error(uploadError);
-        return;
-      }
+        const { data: uploadData, error: uploadError } = await supabaseClient
+          .storage
+          .from("eventos-fotos")
+          .upload(fileName, fotoFile);
 
-      const { error } = await supabaseClient
-        .from("eventos")
-        .insert([{
-          lat: parseFloat(lat),
-          lng: parseFloat(lng),
-          evento: tipo,
-          datos: extraFields,
-          estado: "pendiente",
-          foto_path: uploadData.path
-        }]);
+        if (uploadError) throw uploadError;
 
-      if (error) {
-        alert("Error al guardar el evento");
+        const { error } = await supabaseClient
+          .from("eventos")
+          .insert([{
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            evento: tipo,
+            datos: extraFields,
+            estado: "pendiente",
+            foto_path: uploadData.path
+          }]);
+
+        if (error) throw error;
+
+        alert("¡Evento enviado para revisión!");
+        document.getElementById('formBox').classList.add('hidden');
+        this.reset();
+        document.getElementById('extraFields').innerHTML = '';
+        if (marker) map.removeLayer(marker);
+        marker = null;
+
+      } catch (error) {
         console.error(error);
-        return;
+        alert("Error al procesar la solicitud: " + error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = originalBtnText;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
       }
-
-      alert("¡Evento enviado para revisión!");
-      document.getElementById('formBox').style.display = "none";
     });
 
     async function cargarEventosAprobados() {
@@ -208,17 +250,121 @@
         return;
       }
 
-      data.forEach(ev => {
+      todosLosEventos = data;
+      aplicarFiltros();
+    }
+
+    function aplicarFiltros() {
+      markersLayer.clearLayers(); 
+
+
+      const checkboxes = document.querySelectorAll('.filter-checkbox:checked');
+      const tiposSeleccionados = Array.from(checkboxes).map(cb => cb.value);
+
+      todosLosEventos.forEach(ev => {
+
+        if (!tiposSeleccionados.includes(ev.evento)) return;
+
         const fotoURL = `${SUPABASE_URL}/storage/v1/object/public/eventos-fotos/${ev.foto_path}`;
 
         L.marker([ev.lat, ev.lng])
-          .addTo(map)
+          .addTo(markersLayer)
           .bindPopup(`
-            <b>${ev.evento}</b><br>
-            <img src="${fotoURL}" width="150"><br>
-            <pre>${JSON.stringify(ev.datos, null, 2)}</pre>`);
+            <div class="text-center">
+              <b class="text-lg capitalize text-blue-600">${ev.evento}</b><br>
+              <img src="${fotoURL}" class="w-32 h-auto mx-auto my-2 rounded shadow"><br>
+              <div class="text-left text-xs bg-gray-100 p-2 rounded max-h-32 overflow-auto">
+                ${Object.entries(ev.datos).map(([k, v]) => `<strong>${k}:</strong> ${v}<br>`).join('')}
+              </div>
+            </div>`);
       });
     }
+
+
+    document.querySelectorAll('.filter-checkbox').forEach(cb => {
+      cb.addEventListener('change', aplicarFiltros);
+    });
+
+
+    let isMeasuring = false;
+    let measureLine = null;
+    let measureTooltip = null;
+    let startPoint = null;
+
+    const btnMedir = document.getElementById('btnMedir');
+    const medidaResultado = document.getElementById('medidaResultado');
+
+    btnMedir.addEventListener('click', () => {
+      isMeasuring = !isMeasuring;
+      
+      if (isMeasuring) {
+        btnMedir.classList.add('bg-blue-100', 'text-blue-700', 'border-blue-300');
+        btnMedir.innerHTML = '<span>❌</span><span>Cancelar Medición</span>';
+        medidaResultado.classList.remove('hidden');
+        medidaResultado.innerText = "Haz click y arrastra para medir";
+        map.getContainer().style.cursor = 'crosshair';
+        map.dragging.disable(); 
+      } else {
+        resetMeasurement();
+      }
+    });
+
+    function resetMeasurement() {
+      isMeasuring = false;
+      btnMedir.classList.remove('bg-blue-100', 'text-blue-700', 'border-blue-300');
+      btnMedir.innerHTML = '<span>📏</span><span>Medir Distancia</span>';
+      medidaResultado.classList.add('hidden');
+      map.getContainer().style.cursor = '';
+      map.dragging.enable();
+      
+      if (measureLine) map.removeLayer(measureLine);
+      if (measureTooltip) map.removeLayer(measureTooltip);
+      measureLine = null;
+      measureTooltip = null;
+      startPoint = null;
+    }
+
+    map.on('mousedown', function(e) {
+      if (!isMeasuring) return;
+      
+
+      if (measureLine) map.removeLayer(measureLine);
+      if (measureTooltip) map.removeLayer(measureTooltip);
+
+      startPoint = e.latlng;
+      
+      measureLine = L.polyline([startPoint, startPoint], { color: 'red', weight: 3, dashArray: '5, 10' }).addTo(map);
+      
+      measureTooltip = L.tooltip({ permanent: true, direction: 'right', className: 'bg-white border border-gray-300 px-2 py-1 rounded shadow text-xs font-bold' })
+        .setLatLng(startPoint)
+        .setContent("0 m")
+        .addTo(map);
+    });
+
+    map.on('mousemove', function(e) {
+      if (!isMeasuring || !startPoint) return;
+
+      const currentPoint = e.latlng;
+      measureLine.setLatLngs([startPoint, currentPoint]);
+
+      const distance = startPoint.distanceTo(currentPoint);
+      let distanceText = "";
+      
+      if (distance >= 1000) {
+        distanceText = (distance / 1000).toFixed(2) + " km";
+      } else {
+        distanceText = Math.round(distance) + " m";
+      }
+
+      measureTooltip.setLatLng(currentPoint).setContent(distanceText);
+      medidaResultado.innerText = `Distancia: ${distanceText}`;
+    });
+
+    map.on('mouseup', function() {
+      if (isMeasuring && startPoint) {
+        startPoint = null;
+      }
+    });
 
     cargarEventosAprobados();
   </script>
