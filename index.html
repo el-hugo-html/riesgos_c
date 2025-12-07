@@ -78,7 +78,7 @@
   <script>
     // Supabase config - debes reemplazar estos valores
     const SUPABASE_URL = "https://iktdhszjkirxxtufyivl.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrdGRoc3pqa2lyeHh0dWZ5aXZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNDU2NjQsImV4cCI6MjA4MDYyMTY2NH0.HNdPh-wmFXJvRn5vF2IR0r23CEu-ik-eiiKkXNnQHlU";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrdGRoc3pqa2lyeHh0dWZ5aXZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTA0NTY2NCwiZXhwIjoyMDgwNjIxNjY0fQ.u6l5CZSS_ZhXUlBnQT17Yv5kayCvAFJqB6TxQxU_VHA";
 
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -179,8 +179,8 @@
       const { error } = await supabaseClient
         .from("eventos")
         .insert([{
-          lat: lat,
-          lng: lng,
+          lat: parseFloat(lat),
+          lng: parseFloat(lng),
           evento: tipo,
           datos: extraFields,
           estado: "pendiente",
