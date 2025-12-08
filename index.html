@@ -261,10 +261,19 @@
       const tiposSeleccionados = Array.from(checkboxes).map(cb => cb.value);
 
       const colores = {
-        'deslizamiento': 'gold',
-        'tormenta': 'blue',
-        'volcan': 'red',
-        'alud': 'white'
+        'deslizamiento': '#FFD700',
+        'tormenta': '#0066FF',
+        'volcan': '#FF0000',
+        'alud': '#FFFFFF'
+      };
+
+      const crearIconoSVG = (color) => {
+        const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="25" height="41">
+          <path d="M12 0C7.58 0 4 3.58 4 8c0 5.25 8 16 8 16s8-10.75 8-16c0-4.42-3.58-8-8-8z" fill="${color}" stroke="#333" stroke-width="0.5"/>
+          <circle cx="12" cy="8" r="3" fill="#333"/>
+        </svg>`;
+        
+        return `data:image/svg+xml;base64,${btoa(svgIcon)}`;
       };
 
       todosLosEventos.forEach(ev => {
@@ -272,11 +281,11 @@
         if (!tiposSeleccionados.includes(ev.evento)) return;
 
         const fotoURL = `${SUPABASE_URL}/storage/v1/object/public/eventos-fotos/${ev.foto_path}`;
-        const color = colores[ev.evento] || 'blue';
+        const color = colores[ev.evento] || '#0066FF';
 
         const customIcon = L.icon({
-          iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-${color}.png`,
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+          iconUrl: crearIconoSVG(color),
+          shadowUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNSA0MSI+PHBhdGggZD0iTTAgMjVsMTIuNSAxNkwxMDAgNXoiIGZpbGw9IiMwMDAiIG9wYWNpdHk9IjAuMiIvPjwvc3ZnPg==',
           iconSize: [25, 41],
           iconAnchor: [12, 41],
           popupAnchor: [1, -34],
