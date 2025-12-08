@@ -79,6 +79,11 @@
             </select>
           </div>
 
+          <div>
+            <label for="fecha" class="block text-sm font-medium text-gray-700 mb-1">Fecha del evento</label>
+            <input type="datetime-local" id="fecha" name="fecha" required class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none">
+          </div>
+
           <div id="extraFields" class="space-y-2 p-2 bg-gray-50 rounded border border-gray-200 empty:hidden"></div>
 
           <div>
@@ -192,6 +197,7 @@
         const lat = document.getElementById('lat').value;
         const lng = document.getElementById('lng').value;
         const tipo = document.getElementById('evento').value;
+        const fecha = document.getElementById('fecha').value;
 
         const extraFields = {};
         document.querySelectorAll('#extraFields [name]').forEach(inp => {
@@ -214,6 +220,7 @@
             lat: parseFloat(lat),
             lng: parseFloat(lng),
             evento: tipo,
+            fecha: fecha,
             datos: extraFields,
             estado: "pendiente",
             foto_path: uploadData.path
