@@ -260,13 +260,30 @@
       const checkboxes = document.querySelectorAll('.filter-checkbox:checked');
       const tiposSeleccionados = Array.from(checkboxes).map(cb => cb.value);
 
+      const colores = {
+        'deslizamiento': 'gold',
+        'tormenta': 'blue',
+        'volcan': 'red',
+        'alud': 'white'
+      };
+
       todosLosEventos.forEach(ev => {
 
         if (!tiposSeleccionados.includes(ev.evento)) return;
 
         const fotoURL = `${SUPABASE_URL}/storage/v1/object/public/eventos-fotos/${ev.foto_path}`;
+        const color = colores[ev.evento] || 'blue';
 
-        L.marker([ev.lat, ev.lng])
+        const customIcon = L.icon({
+          iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-${color}.png`,
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        });
+
+        L.marker([ev.lat, ev.lng], { icon: customIcon })
           .addTo(markersLayer)
           .bindPopup(`
             <div class="text-center">
