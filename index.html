@@ -42,6 +42,17 @@
         </div>
         
         <div class="mt-4 pt-4 border-t border-gray-200">
+          <h3 class="text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Filtrar por Fecha</h3>
+          <div class="space-y-2">
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" id="filtroFechaToggle" class="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500">
+              <span class="text-sm text-gray-700">Filtrar por fecha</span>
+            </label>
+            <input type="date" id="filtroFecha" disabled class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none disabled:bg-gray-100">
+          </div>
+        </div>
+        
+        <div class="mt-4 pt-4 border-t border-gray-200">
           <button id="btnMedir" class="w-full flex items-center justify-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-3 rounded transition text-sm border border-gray-300">
             <span>Medir Distancia</span>
           </button>
@@ -267,6 +278,9 @@
       const checkboxes = document.querySelectorAll('.filter-checkbox:checked');
       const tiposSeleccionados = Array.from(checkboxes).map(cb => cb.value);
 
+      const filtroFechaToggle = document.getElementById('filtroFechaToggle').checked;
+      const filtroFechaInput = document.getElementById('filtroFecha').value;
+
       const colores = {
         'deslizamiento': '#FFD700',
         'tormenta': '#0066FF',
@@ -287,8 +301,15 @@
 
         if (!tiposSeleccionados.includes(ev.evento)) return;
 
+        if (filtroFechaToggle && filtroFechaInput) {
+          const fechaEvento = ev.fecha ? ev.fecha.split('T')[0] : null;
+          if (fechaEvento !== filtroFechaInput) return;
+        }
+
         const fotoURL = `${SUPABASE_URL}/storage/v1/object/public/eventos-fotos/${ev.foto_path}`;
         const color = colores[ev.evento] || '#0066FF';
+
+        const fechaFormato = ev.fecha ? new Date(ev.fecha).toLocaleString('es-CL') : 'Fecha no disponible';
 
         const customIcon = L.icon({
           iconUrl: crearIconoSVG(color),
@@ -304,6 +325,7 @@
           .bindPopup(`
             <div class="text-center">
               <b class="text-lg capitalize text-blue-600">${ev.evento}</b><br>
+              <small class="text-gray-600">${fechaFormato}</small><br>
               <img src="${fotoURL}" class="w-32 h-auto mx-auto my-2 rounded shadow"><br>
               <div class="text-left text-xs bg-gray-100 p-2 rounded max-h-32 overflow-auto">
                 ${Object.entries(ev.datos).map(([k, v]) => `<strong>${k}:</strong> ${v}<br>`).join('')}
@@ -316,6 +338,16 @@
     document.querySelectorAll('.filter-checkbox').forEach(cb => {
       cb.addEventListener('change', aplicarFiltros);
     });
+
+    const filtroFechaToggle = document.getElementById('filtroFechaToggle');
+    const filtroFechaInput = document.getElementById('filtroFecha');
+
+    filtroFechaToggle.addEventListener('change', function() {
+      filtroFechaInput.disabled = !this.checked;
+      aplicarFiltros();
+    });
+
+    filtroFechaInput.addEventListener('change', aplicarFiltros);
 
 
     let isMeasuring = false;
