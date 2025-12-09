@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="text-gray-800 font-sans" style="background-image: url('montana.png'); background-size: cover; background-position: center; background-attachment: fixed;">
 
@@ -111,6 +113,58 @@
           </button>
         </form>
       </div>
+
+      <!-- Panel de Estadísticas -->
+      <div class="absolute top-4 right-4 z-[999] max-w-lg w-full bg-white p-4 rounded-xl shadow-2xl hidden max-h-[calc(100%-2rem)] overflow-y-auto" id="statsPanel">
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+          <h3 class="text-lg font-semibold text-gray-800">Estadísticas</h3>
+          <button type="button" onclick="document.getElementById('statsPanel').classList.add('hidden')" class="text-gray-500 hover:text-red-500 font-bold text-xl">&times;</button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de gráfico</label>
+            <div class="flex gap-2">
+              <button id="btnGraficoTorta" class="flex-1 py-2 px-3 bg-blue-600 text-white rounded text-sm font-semibold hover:bg-blue-700 transition">Torta por Año</button>
+              <button id="btnGraficoSerie" class="flex-1 py-2 px-3 bg-gray-300 text-gray-700 rounded text-sm font-semibold hover:bg-gray-400 transition">Serie Temporal</button>
+            </div>
+          </div>
+
+          <div id="controlesTorta" class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Seleccionar año</label>
+            <select id="selectYear" class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none">
+              <option value="">Cargando...</option>
+            </select>
+          </div>
+
+          <div id="controlesSerie" class="space-y-2 hidden">
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" id="chkDeslizamiento" value="deslizamiento" class="form-checkbox h-4 w-4 text-blue-600 rounded" checked>
+              <span class="text-sm text-gray-700">Deslizamiento</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" id="chkTormenta" value="tormenta" class="form-checkbox h-4 w-4 text-blue-600 rounded" checked>
+              <span class="text-sm text-gray-700">Tormenta convectiva</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" id="chkVolcan" value="volcan" class="form-checkbox h-4 w-4 text-blue-600 rounded" checked>
+              <span class="text-sm text-gray-700">Actividad volcánica</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" id="chkAlud" value="alud" class="form-checkbox h-4 w-4 text-blue-600 rounded" checked>
+              <span class="text-sm text-gray-700">Alud</span>
+            </label>
+          </div>
+
+          <div class="relative w-full h-64 bg-gray-50 rounded border border-gray-200 p-2">
+            <canvas id="chartCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <button id="btnEstadisticas" class="absolute top-4 right-4 z-[998] bg-blue-600 text-white px-4 py-2 rounded-xl shadow-lg hover:bg-blue-700 transition font-semibold text-sm">
+        📊 Estadísticas
+      </button>
     </div>
   </div>
 
@@ -590,6 +644,243 @@
         filterPanel.style.cursor = 'default';
       }
     });
+
+    // Panel de Estadísticas
+    const btnEstadisticas = document.getElementById('btnEstadisticas');
+    const statsPanel = document.getElementById('statsPanel');
+    const btnGraficoTorta = document.getElementById('btnGraficoTorta');
+    const btnGraficoSerie = document.getElementById('btnGraficoSerie');
+    const selectYear = document.getElementById('selectYear');
+    const controlesTorta = document.getElementById('controlesTorta');
+    const controlesSerie = document.getElementById('controlesSerie');
+    const chartCanvas = document.getElementById('chartCanvas');
+    let currentChart = null;
+    let tipoGraficoActual = 'torta';
+
+    btnEstadisticas.addEventListener('click', function() {
+      statsPanel.classList.toggle('hidden');
+    });
+
+    function cargarAños() {
+      const años = new Set();
+      todosLosEventos.forEach(ev => {
+        if (ev.fecha) {
+          const año = new Date(ev.fecha).getFullYear();
+          años.add(año);
+        }
+      });
+
+      const añosOrdenados = Array.from(años).sort((a, b) => b - a);
+      selectYear.innerHTML = '<option value="">Todos los años</option>';
+      añosOrdenados.forEach(año => {
+        const option = document.createElement('option');
+        option.value = año;
+        option.textContent = año;
+        selectYear.appendChild(option);
+      });
+
+      if (selectYear.options.length > 1) {
+        selectYear.value = añosOrdenados[0];
+      }
+    }
+
+    function dibujarGraficoTorta() {
+      const año = selectYear.value;
+      const eventosFiltrados = todosLosEventos.filter(ev => {
+        if (!ev.fecha) return false;
+        const fechaAño = new Date(ev.fecha).getFullYear();
+        return año ? fechaAño == año : true;
+      });
+
+      const conteos = {
+        'deslizamiento': 0,
+        'tormenta': 0,
+        'volcan': 0,
+        'alud': 0
+      };
+
+      eventosFiltrados.forEach(ev => {
+        if (conteos.hasOwnProperty(ev.evento)) {
+          conteos[ev.evento]++;
+        }
+      });
+
+      if (currentChart) currentChart.destroy();
+
+      currentChart = new Chart(chartCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: ['Deslizamiento', 'Tormenta convectiva', 'Actividad volcánica', 'Alud'],
+          datasets: [{
+            data: [conteos.deslizamiento, conteos.tormenta, conteos.volcan, conteos.alud],
+            backgroundColor: ['#FFD700', '#0066FF', '#FF0000', '#FFFFFF'],
+            borderColor: ['#FFC700', '#0052CC', '#CC0000', '#E0E0E0'],
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                font: { size: 11 },
+                padding: 10
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function dibujarGraficoSerie() {
+      const tiposSeleccionados = [];
+      if (document.getElementById('chkDeslizamiento').checked) tiposSeleccionados.push('deslizamiento');
+      if (document.getElementById('chkTormenta').checked) tiposSeleccionados.push('tormenta');
+      if (document.getElementById('chkVolcan').checked) tiposSeleccionados.push('volcan');
+      if (document.getElementById('chkAlud').checked) tiposSeleccionados.push('alud');
+
+      // Agrupar eventos por mes
+      const datospMeses = {};
+      const colores = {
+        'deslizamiento': '#FFD700',
+        'tormenta': '#0066FF',
+        'volcan': '#FF0000',
+        'alud': '#FFFFFF'
+      };
+
+      tiposSeleccionados.forEach(tipo => {
+        datospMeses[tipo] = {};
+      });
+
+      todosLosEventos.forEach(ev => {
+        if (!tiposSeleccionados.includes(ev.evento) || !ev.fecha) return;
+        const fecha = new Date(ev.fecha);
+        const meshKey = fecha.getFullYear() + '-' + String(fecha.getMonth() + 1).padStart(2, '0');
+        datospMeses[ev.evento][meshKey] = (datospMeses[ev.evento][meshKey] || 0) + 1;
+      });
+
+      // Obtener todos los meses únicos y ordenarlos
+      const todosMeses = new Set();
+      Object.values(datospMeses).forEach(meses => {
+        Object.keys(meses).forEach(mes => todosMeses.add(mes));
+      });
+      const mesesOrdenados = Array.from(todosMeses).sort();
+
+      const datasets = tiposSeleccionados.map(tipo => ({
+        label: {
+          'deslizamiento': 'Deslizamiento',
+          'tormenta': 'Tormenta convectiva',
+          'volcan': 'Actividad volcánica',
+          'alud': 'Alud'
+        }[tipo],
+        data: mesesOrdenados.map(mes => datospMeses[tipo][mes] || 0),
+        borderColor: colores[tipo],
+        backgroundColor: colores[tipo] + '33',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4
+      }));
+
+      if (currentChart) currentChart.destroy();
+
+      currentChart = new Chart(chartCanvas, {
+        type: 'line',
+        data: {
+          labels: mesesOrdenados,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                font: { size: 10 },
+                padding: 8
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                stepSize: 1,
+                font: { size: 10 }
+              }
+            },
+            x: {
+              ticks: {
+                font: { size: 9 }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    btnGraficoTorta.addEventListener('click', function() {
+      tipoGraficoActual = 'torta';
+      btnGraficoTorta.classList.add('bg-blue-600', 'text-white');
+      btnGraficoTorta.classList.remove('bg-gray-300', 'text-gray-700');
+      btnGraficoSerie.classList.remove('bg-blue-600', 'text-white');
+      btnGraficoSerie.classList.add('bg-gray-300', 'text-gray-700');
+      controlesTorta.classList.remove('hidden');
+      controlesSerie.classList.add('hidden');
+      dibujarGraficoTorta();
+    });
+
+    btnGraficoSerie.addEventListener('click', function() {
+      tipoGraficoActual = 'serie';
+      btnGraficoSerie.classList.add('bg-blue-600', 'text-white');
+      btnGraficoSerie.classList.remove('bg-gray-300', 'text-gray-700');
+      btnGraficoTorta.classList.remove('bg-blue-600', 'text-white');
+      btnGraficoTorta.classList.add('bg-gray-300', 'text-gray-700');
+      controlesTorta.classList.add('hidden');
+      controlesSerie.classList.remove('hidden');
+      dibujarGraficoSerie();
+    });
+
+    selectYear.addEventListener('change', function() {
+      if (tipoGraficoActual === 'torta') {
+        dibujarGraficoTorta();
+      }
+    });
+
+    document.getElementById('chkDeslizamiento').addEventListener('change', function() {
+      if (tipoGraficoActual === 'serie') dibujarGraficoSerie();
+    });
+    document.getElementById('chkTormenta').addEventListener('change', function() {
+      if (tipoGraficoActual === 'serie') dibujarGraficoSerie();
+    });
+    document.getElementById('chkVolcan').addEventListener('change', function() {
+      if (tipoGraficoActual === 'serie') dibujarGraficoSerie();
+    });
+    document.getElementById('chkAlud').addEventListener('change', function() {
+      if (tipoGraficoActual === 'serie') dibujarGraficoSerie();
+    });
+
+    // Cargar años al cargar eventos
+    cargarEventosAprobados = (async function(originalFunc) {
+      return async function() {
+        const { data, error } = await supabaseClient
+          .from("eventos")
+          .select("*")
+          .eq("estado", "aprobado");
+
+        if (error) {
+          console.error("Error cargando eventos:", error);
+          return;
+        }
+
+        todosLosEventos = data;
+        cargarAños();
+        dibujarGraficoTorta();
+        aplicarFiltros();
+      };
+    })(cargarEventosAprobados);
   </script>
 
 </body>
