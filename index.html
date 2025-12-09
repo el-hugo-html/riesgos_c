@@ -527,24 +527,29 @@
 
     cargarEventosAprobados();
 
-    // Hacer el panel de filtros arrastrable
+    // Hacer el panel de filtros arrastrable (mouse y táctil)
     const filterPanel = document.getElementById('filterPanel');
     let isDragging = false;
     let dragOffset = { x: 0, y: 0 };
 
-    filterPanel.addEventListener('mousedown', function(e) {
+    function startDrag(e) {
       isDragging = true;
-      dragOffset.x = e.clientX - filterPanel.offsetLeft;
-      dragOffset.y = e.clientY - filterPanel.offsetTop;
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      dragOffset.x = clientX - filterPanel.offsetLeft;
+      dragOffset.y = clientY - filterPanel.offsetTop;
       filterPanel.style.cursor = 'grabbing';
-    });
+    }
 
-    document.addEventListener('mousemove', function(e) {
+    function moveDrag(e) {
       if (!isDragging) return;
 
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+
       const mapContainer = document.getElementById('map').parentElement;
-      const newX = e.clientX - dragOffset.x;
-      const newY = e.clientY - dragOffset.y;
+      const newX = clientX - dragOffset.x;
+      const newY = clientY - dragOffset.y;
 
       // Limitar dentro del contenedor del mapa
       const maxX = mapContainer.offsetWidth - filterPanel.offsetWidth;
@@ -553,12 +558,26 @@
       filterPanel.style.left = Math.max(0, Math.min(newX, maxX)) + 'px';
       filterPanel.style.top = Math.max(0, Math.min(newY, maxY)) + 'px';
       filterPanel.style.bottom = 'auto';
-    });
 
-    document.addEventListener('mouseup', function() {
+      if (e.type.startsWith('touch')) {
+        e.preventDefault();
+      }
+    }
+
+    function endDrag(e) {
       isDragging = false;
       filterPanel.style.cursor = 'move';
-    });
+    }
+
+    // Eventos del mouse
+    filterPanel.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', moveDrag);
+    document.addEventListener('mouseup', endDrag);
+
+    // Eventos táctiles
+    filterPanel.addEventListener('touchstart', startDrag);
+    document.addEventListener('touchmove', moveDrag);
+    document.addEventListener('touchend', endDrag);
 
     filterPanel.addEventListener('mouseover', function() {
       if (!isDragging) {
