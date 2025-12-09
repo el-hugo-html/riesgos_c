@@ -183,7 +183,7 @@
         </div>
       </div>
 
-      <button id="btnEstadisticas" class="absolute top-4 right-4 z-[998] bg-blue-600 text-white px-4 py-2 rounded-xl shadow-lg hover:bg-blue-700 transition font-semibold text-sm">
+      <button id="btnEstadisticas" class="absolute top-4 right-4 z-[998] bg-blue-600 text-white px-4 py-2 rounded-xl shadow-lg hover:bg-blue-700 transition font-semibold text-sm cursor-move">
         📊 Estadísticas
       </button>
     </div>
@@ -677,9 +677,72 @@
     const chartCanvas = document.getElementById('chartCanvas');
     let currentChart = null;
     let tipoGraficoActual = 'torta';
+    let isDraggingBtn = false;
+    let dragOffsetBtn = { x: 0, y: 0 };
 
-    btnEstadisticas.addEventListener('click', function() {
-      statsPanel.classList.toggle('hidden');
+    function startDragBtn(e) {
+      isDraggingBtn = true;
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      dragOffsetBtn.x = clientX - btnEstadisticas.offsetLeft;
+      dragOffsetBtn.y = clientY - btnEstadisticas.offsetTop;
+      btnEstadisticas.style.cursor = 'grabbing';
+    }
+
+    function moveDragBtn(e) {
+      if (!isDraggingBtn) return;
+
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+
+      const mapContainer = document.getElementById('map').parentElement;
+      const newX = clientX - dragOffsetBtn.x;
+      const newY = clientY - dragOffsetBtn.y;
+
+      // Limitar dentro del contenedor del mapa
+      const maxX = mapContainer.offsetWidth - btnEstadisticas.offsetWidth;
+      const maxY = mapContainer.offsetHeight - btnEstadisticas.offsetHeight;
+
+      btnEstadisticas.style.left = Math.max(0, Math.min(newX, maxX)) + 'px';
+      btnEstadisticas.style.top = Math.max(0, Math.min(newY, maxY)) + 'px';
+      btnEstadisticas.style.right = 'auto';
+
+      if (e.type.startsWith('touch')) {
+        e.preventDefault();
+      }
+    }
+
+    function endDragBtn(e) {
+      isDraggingBtn = false;
+      btnEstadisticas.style.cursor = 'move';
+    }
+
+    // Eventos del mouse para el botón
+    btnEstadisticas.addEventListener('mousedown', startDragBtn);
+    document.addEventListener('mousemove', moveDragBtn);
+    document.addEventListener('mouseup', endDragBtn);
+
+    // Eventos táctiles para el botón
+    btnEstadisticas.addEventListener('touchstart', startDragBtn);
+    document.addEventListener('touchmove', moveDragBtn);
+    document.addEventListener('touchend', endDragBtn);
+
+    btnEstadisticas.addEventListener('mouseover', function() {
+      if (!isDraggingBtn) {
+        btnEstadisticas.style.cursor = 'move';
+      }
+    });
+
+    btnEstadisticas.addEventListener('mouseout', function() {
+      if (!isDraggingBtn) {
+        btnEstadisticas.style.cursor = 'default';
+      }
+    });
+
+    btnEstadisticas.addEventListener('click', function(e) {
+      if (!isDraggingBtn) {
+        statsPanel.classList.toggle('hidden');
+      }
     });
 
     function cargarAños() {
