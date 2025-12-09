@@ -20,7 +20,7 @@
       <div id="map" class="h-full w-full z-0"></div>
 
       <!-- Panel de Filtros -->
-      <div class="absolute bottom-4 left-4 z-[1000] bg-white p-4 rounded-xl shadow-2xl max-w-xs">
+      <div class="absolute bottom-4 left-12 z-[1000] bg-white p-4 rounded-xl shadow-2xl max-w-xs">
         <h3 class="text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Capas</h3>
         <div class="space-y-2">
           <label class="flex items-center space-x-2 cursor-pointer">
@@ -49,6 +49,10 @@
               <span class="text-sm text-gray-700">Filtrar por fecha</span>
             </label>
             <input type="date" id="filtroFecha" disabled class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none disabled:bg-gray-100">
+          </div>
+          <div id="resumenEventos" class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded hidden">
+            <h4 class="text-xs font-bold text-blue-700 mb-2 uppercase">Resumen de Eventos</h4>
+            <div id="resumenContenido" class="text-xs text-blue-700 space-y-1"></div>
           </div>
         </div>
         
@@ -274,12 +278,13 @@
     function aplicarFiltros() {
       markersLayer.clearLayers(); 
 
-
       const checkboxes = document.querySelectorAll('.filter-checkbox:checked');
       const tiposSeleccionados = Array.from(checkboxes).map(cb => cb.value);
 
       const filtroFechaToggle = document.getElementById('filtroFechaToggle').checked;
       const filtroFechaInput = document.getElementById('filtroFecha').value;
+      const resumenEventos = document.getElementById('resumenEventos');
+      const resumenContenido = document.getElementById('resumenContenido');
 
       const colores = {
         'deslizamiento': '#FFD700',
@@ -287,6 +292,16 @@
         'volcan': '#FF0000',
         'alud': '#FFFFFF'
       };
+
+      const nombreEventos = {
+        'deslizamiento': 'Deslizamiento',
+        'tormenta': 'Tormenta convectiva',
+        'volcan': 'Actividad volcánica',
+        'alud': 'Alud'
+      };
+
+      const gatillantes = ['tormenta', 'volcan'];
+      const secundarios = ['deslizamiento', 'alud'];
 
       const crearIconoSVG = (color) => {
         const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="25" height="41">
@@ -297,6 +312,11 @@
         return `data:image/svg+xml;base64,${btoa(svgIcon)}`;
       };
 
+      const resumenPorTipo = {};
+      let eventosMostrados = 0;
+      let eventosGatillantes = [];
+      let eventosSecundarios = [];
+
       todosLosEventos.forEach(ev => {
 
         if (!tiposSeleccionados.includes(ev.evento)) return;
@@ -304,6 +324,17 @@
         if (filtroFechaToggle && filtroFechaInput) {
           const fechaEvento = ev.fecha ? ev.fecha.split('T')[0] : null;
           if (fechaEvento !== filtroFechaInput) return;
+        }
+
+        eventosMostrados++;
+        if (filtroFechaToggle && filtroFechaInput) {
+          resumenPorTipo[ev.evento] = (resumenPorTipo[ev.evento] || 0) + 1;
+          
+          if (gatillantes.includes(ev.evento)) {
+            eventosGatillantes.push(ev);
+          } else if (secundarios.includes(ev.evento)) {
+            eventosSecundarios.push(ev);
+          }
         }
 
         const fotoURL = `${SUPABASE_URL}/storage/v1/object/public/eventos-fotos/${ev.foto_path}`;
@@ -332,6 +363,70 @@
               </div>
             </div>`);
       });
+
+      // Dibujar líneas de gatillantes a secundarios (solo la línea más corta por secundario)
+      if (filtroFechaToggle && filtroFechaInput && eventosGatillantes.length > 0 && eventosSecundarios.length > 0) {
+        eventosSecundarios.forEach(secundario => {
+          let gatillantesCercano = null;
+          let distanciaMinima = Infinity;
+
+          eventosGatillantes.forEach(gatillante => {
+            const latlng1 = [gatillante.lat, gatillante.lng];
+            const latlng2 = [secundario.lat, secundario.lng];
+            const distancia = L.latLng(latlng1).distanceTo(L.latLng(latlng2));
+
+            if (distancia < distanciaMinima) {
+              distanciaMinima = distancia;
+              gatillantesCercano = gatillante;
+            }
+          });
+
+          if (gatillantesCercano) {
+            const latlng1 = [gatillantesCercano.lat, gatillantesCercano.lng];
+            const latlng2 = [secundario.lat, secundario.lng];
+            
+            let distanciaTexto = '';
+            if (distanciaMinima >= 1000) {
+              distanciaTexto = (distanciaMinima / 1000).toFixed(2) + ' km';
+            } else {
+              distanciaTexto = Math.round(distanciaMinima) + ' m';
+            }
+
+            const polyline = L.polyline([latlng1, latlng2], {
+              color: 'red',
+              weight: 2,
+              opacity: 0.7,
+              dashArray: '5, 5'
+            }).addTo(markersLayer);
+
+            const midpoint = L.latLng(
+              (latlng1[0] + latlng2[0]) / 2,
+              (latlng1[1] + latlng2[1]) / 2
+            );
+
+            L.tooltip({
+              permanent: true,
+              direction: 'center',
+              className: 'bg-red-100 border border-red-500 text-red-800 text-xs font-bold px-2 py-1 rounded'
+            })
+              .setLatLng(midpoint)
+              .setContent(distanciaTexto)
+              .addTo(markersLayer);
+          }
+        });
+      }
+
+      if (filtroFechaToggle && filtroFechaInput && eventosMostrados > 0) {
+        let html = '';
+        Object.entries(resumenPorTipo).forEach(([tipo, cantidad]) => {
+          html += `<div class="flex justify-between"><span>${nombreEventos[tipo]}:</span><strong>${cantidad}</strong></div>`;
+        });
+        html += `<div class="border-t border-blue-200 mt-2 pt-2 flex justify-between font-bold"><span>Total:</span><strong>${eventosMostrados}</strong></div>`;
+        resumenContenido.innerHTML = html;
+        resumenEventos.classList.remove('hidden');
+      } else {
+        resumenEventos.classList.add('hidden');
+      }
     }
 
 
