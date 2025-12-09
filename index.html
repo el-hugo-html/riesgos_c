@@ -121,23 +121,22 @@
           <button type="button" onclick="document.getElementById('statsPanel').classList.add('hidden')" class="text-gray-500 hover:text-red-500 font-bold text-xl">&times;</button>
         </div>
 
-        <div class="space-y-4">
+        <div class="space-y-3">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de gráfico</label>
             <div class="flex gap-2">
-              <button id="btnGraficoTorta" class="flex-1 py-2 px-3 bg-blue-600 text-white rounded text-sm font-semibold hover:bg-blue-700 transition">Torta por Año</button>
+              <button id="btnGraficoTorta" class="flex-1 py-2 px-3 bg-blue-600 text-white rounded text-sm font-semibold hover:bg-blue-700 transition">Gráfico Circular</button>
               <button id="btnGraficoSerie" class="flex-1 py-2 px-3 bg-gray-300 text-gray-700 rounded text-sm font-semibold hover:bg-gray-400 transition">Serie Temporal</button>
             </div>
           </div>
 
-          <div id="controlesTorta" class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Seleccionar año</label>
-            <select id="selectYear" class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none">
-              <option value="">Cargando...</option>
-            </select>
+          <div id="controlesTorta" class="space-y-2 p-3 bg-blue-50 rounded border border-blue-200">
+            <label class="block text-sm font-medium text-gray-700">Seleccionar fecha</label>
+            <input type="date" id="selectDate" class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none bg-white relative z-50">
           </div>
 
-          <div id="controlesSerie" class="space-y-2 hidden">
+          <div id="controlesSerie" class="space-y-2 p-3 bg-blue-50 rounded border border-blue-200 hidden">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Seleccionar eventos</label>
             <label class="flex items-center space-x-2 cursor-pointer">
               <input type="checkbox" id="chkDeslizamiento" value="deslizamiento" class="form-checkbox h-4 w-4 text-blue-600 rounded" checked>
               <span class="text-sm text-gray-700">Deslizamiento</span>
@@ -156,7 +155,7 @@
             </label>
           </div>
 
-          <div class="relative w-full h-64 bg-gray-50 rounded border border-gray-200 p-2">
+          <div class="relative w-full h-80 bg-gray-50 rounded border border-gray-200 p-2">
             <canvas id="chartCanvas"></canvas>
           </div>
         </div>
@@ -650,7 +649,7 @@
     const statsPanel = document.getElementById('statsPanel');
     const btnGraficoTorta = document.getElementById('btnGraficoTorta');
     const btnGraficoSerie = document.getElementById('btnGraficoSerie');
-    const selectYear = document.getElementById('selectYear');
+    const selectDate = document.getElementById('selectDate');
     const controlesTorta = document.getElementById('controlesTorta');
     const controlesSerie = document.getElementById('controlesSerie');
     const chartCanvas = document.getElementById('chartCanvas');
@@ -671,25 +670,18 @@
       });
 
       const añosOrdenados = Array.from(años).sort((a, b) => b - a);
-      selectYear.innerHTML = '<option value="">Todos los años</option>';
-      añosOrdenados.forEach(año => {
-        const option = document.createElement('option');
-        option.value = año;
-        option.textContent = año;
-        selectYear.appendChild(option);
-      });
-
-      if (selectYear.options.length > 1) {
-        selectYear.value = añosOrdenados[0];
+      if (todosLosEventos.length > 0 && todosLosEventos[0].fecha) {
+        const fechaDefault = new Date(todosLosEventos[0].fecha).toISOString().split('T')[0];
+        selectDate.value = fechaDefault;
       }
     }
 
     function dibujarGraficoTorta() {
-      const año = selectYear.value;
+      const fecha = document.getElementById('selectDate').value;
       const eventosFiltrados = todosLosEventos.filter(ev => {
-        if (!ev.fecha) return false;
-        const fechaAño = new Date(ev.fecha).getFullYear();
-        return año ? fechaAño == año : true;
+        if (!ev.fecha || !fecha) return false;
+        const fechaEvento = ev.fecha.split('T')[0];
+        return fechaEvento === fecha;
       });
 
       const conteos = {
@@ -706,6 +698,9 @@
       });
 
       if (currentChart) currentChart.destroy();
+
+      const total = Object.values(conteos).reduce((a, b) => a + b, 0);
+      const tituloGrafico = total === 0 ? 'Sin eventos este día' : `Eventos del ${fecha}`;
 
       currentChart = new Chart(chartCanvas, {
         type: 'doughnut',
@@ -728,6 +723,11 @@
                 font: { size: 11 },
                 padding: 10
               }
+            },
+            title: {
+              display: true,
+              text: tituloGrafico,
+              font: { size: 12, weight: 'bold' }
             }
           }
         }
@@ -843,7 +843,7 @@
       dibujarGraficoSerie();
     });
 
-    selectYear.addEventListener('change', function() {
+    selectDate.addEventListener('change', function() {
       if (tipoGraficoActual === 'torta') {
         dibujarGraficoTorta();
       }
@@ -863,24 +863,23 @@
     });
 
     // Cargar años al cargar eventos
-    cargarEventosAprobados = (async function(originalFunc) {
-      return async function() {
-        const { data, error } = await supabaseClient
-          .from("eventos")
-          .select("*")
-          .eq("estado", "aprobado");
+    const originalCargarEventos = cargarEventosAprobados;
+    cargarEventosAprobados = async function() {
+      const { data, error } = await supabaseClient
+        .from("eventos")
+        .select("*")
+        .eq("estado", "aprobado");
 
-        if (error) {
-          console.error("Error cargando eventos:", error);
-          return;
-        }
+      if (error) {
+        console.error("Error cargando eventos:", error);
+        return;
+      }
 
-        todosLosEventos = data;
-        cargarAños();
-        dibujarGraficoTorta();
-        aplicarFiltros();
-      };
-    })(cargarEventosAprobados);
+      todosLosEventos = data;
+      cargarAños();
+      dibujarGraficoTorta();
+      aplicarFiltros();
+    };
   </script>
 
 </body>
